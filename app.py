@@ -142,8 +142,13 @@ hr { border-color: rgba(226,201,126,0.15) !important; }
 # ── Load Model ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    with open("model.pkl.gz", "rb") as f:
-        return pickle.load(f)
+    try:
+        with gzip.open("model.pkl.gz", "rb") as f:
+            model = pickle.load(f)
+        return model
+    except Exception as e:
+        st.error(f"❌ Model loading failed: {e}")
+        return None
 
 try:
     model = load_model()
