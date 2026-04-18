@@ -3,6 +3,7 @@ import pickle
 import numpy as np
 import warnings
 import gzip
+import pandas as pd
 warnings.filterwarnings("ignore")
 
 # ── Page config ──────────────────────────────────────────────────────────────
@@ -21,13 +22,11 @@ html, body, [class*="css"] {
     font-family: 'DM Sans', sans-serif;
 }
 
-/* Background */
 .stApp {
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     min-height: 100vh;
 }
 
-/* Title */
 h1 {
     font-family: 'Playfair Display', serif !important;
     color: #e2c97e !important;
@@ -35,16 +34,6 @@ h1 {
     text-align: center;
 }
 
-h3 {
-    font-family: 'DM Sans', sans-serif !important;
-    color: #a8b2d8 !important;
-    font-size: 0.85rem !important;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    margin-bottom: 0.2rem !important;
-}
-
-/* Cards */
 .card {
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(226,201,126,0.2);
@@ -54,7 +43,6 @@ h3 {
     backdrop-filter: blur(10px);
 }
 
-/* Result box */
 .result-box {
     background: linear-gradient(135deg, #e2c97e22, #f0a50022);
     border: 2px solid #e2c97e;
@@ -77,53 +65,14 @@ h3 {
     margin-top: 0.5rem;
 }
 
-/* Feature importance bar */
-.feat-bar-wrap { margin: 0.4rem 0; }
-.feat-label {
-    color: #c9d1d9;
-    font-size: 0.8rem;
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 3px;
-}
-.feat-bar-bg {
-    background: rgba(255,255,255,0.08);
-    border-radius: 4px;
-    height: 8px;
-    width: 100%;
-}
-.feat-bar-fill {
-    background: linear-gradient(90deg, #e2c97e, #f0a500);
-    border-radius: 4px;
-    height: 8px;
-}
-
-/* Select boxes & sliders */
-.stSelectbox label, .stSlider label, .stNumberInput label {
-    color: #a8b2d8 !important;
-    font-size: 0.82rem !important;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-}
-.stSelectbox > div > div {
-    background: rgba(255,255,255,0.07) !important;
-    border: 1px solid rgba(226,201,126,0.3) !important;
-    border-radius: 10px !important;
-    color: #e6edf3 !important;
-}
-
-/* Button */
 .stButton > button {
     background: linear-gradient(135deg, #e2c97e, #f0a500) !important;
     color: #1a1a2e !important;
-    font-family: 'DM Sans', sans-serif !important;
     font-weight: 700 !important;
-    font-size: 1rem !important;
     border: none !important;
     border-radius: 12px !important;
     padding: 0.75rem 2rem !important;
     width: 100%;
-    letter-spacing: 1px;
     transition: all 0.2s ease !important;
 }
 .stButton > button:hover {
@@ -131,11 +80,10 @@ h3 {
     box-shadow: 0 8px 25px rgba(226,201,126,0.4) !important;
 }
 
-/* Divider */
-hr { border-color: rgba(226,201,126,0.15) !important; }
-
-/* Hide Streamlit branding */
-#MainMenu, footer { visibility: hidden; }
+/* Fix for select boxes */
+.stSelectbox label, .stSlider label, .stNumberInput label {
+    color: #a8b2d8 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -144,11 +92,25 @@ hr { border-color: rgba(226,201,126,0.15) !important; }
 def load_model():
     """Load the trained model from a gzipped pickle file."""
     try:
-        with gzip.open("model.pkl.gz", "rb") as f:
-            model = pickle.load(f)
-        return model
-    except FileNotFoundError:
-        st.error("❌ Model file 'model.pkl.gz' not found. Please ensure it exists in the application directory.")
+        # Try different possible filenames
+        possible_files = ["model.pkl.gz", "1776502619820_model__3_.pkl", "model.pkl"]
+        
+        for filename in possible_files:
+            try:
+                if filename.endswith('.gz'):
+                    with gzip.open(filename, "rb") as f:
+                        model = pickle.load(f)
+                else:
+                    with open(filename, "rb") as f:
+                        model = pickle.load(f)
+                st.success(f"✅ Model loaded successfully from {filename}")
+                return model
+            except FileNotFoundError:
+                continue
+            except Exception as e:
+                continue
+        
+        st.error("❌ No model file found. Please check the model file name.")
         return None
     except Exception as e:
         st.error(f"❌ Model loading failed: {e}")
@@ -156,7 +118,9 @@ def load_model():
 
 # Load the model
 model = load_model()
-model_loaded = model is not None
+
+if model is None:
+    st.stop()
 
 # ── Feature Options ───────────────────────────────────────────────────────────
 GENDER_OPTIONS       = ["Male", "Female"]
@@ -165,14 +129,14 @@ ITEM_OPTIONS         = ["Blouse","Sweater","Jeans","Sandals","Sneakers","Shirt",
                         "Jacket","Gloves","Belt","Boots","Scarf","Hat","Socks","Jewelry",
                         "Backpack","T-shirt","Hoodie","Leggings"]
 CATEGORY_OPTIONS     = ["Clothing","Footwear","Outerwear","Accessories"]
-LOCATION_OPTIONS     = ["Kentucky","Maine","Massachusetts","Rhode Island","Oregon","Wyoming",
+LOCATION_OPTIONS     = sorted(["Kentucky","Maine","Massachusetts","Rhode Island","Oregon","Wyoming",
                         "Montana","Louisiana","West Virginia","Missouri","Arkansas","Hawaii",
                         "Delaware","New Hampshire","New York","Alabama","Mississippi","North Dakota",
                         "Oklahoma","South Dakota","New Mexico","Iowa","Vermont","Arizona","Texas",
                         "Virginia","Tennessee","New Jersey","Nevada","Ohio","Idaho","California",
                         "Michigan","Wisconsin","Georgia","Nebraska","North Carolina","Washington",
                         "Utah","Maryland","Colorado","Pennsylvania","Alaska","Connecticut",
-                        "Indiana","Minnesota","Florida","Kansas","South Carolina","Illinois"]
+                        "Indiana","Minnesota","Florida","Kansas","South Carolina","Illinois"])
 SIZE_OPTIONS         = ["XS","S","M","L","XL"]
 COLOR_OPTIONS        = ["Turquoise","White","Charcoal","Silver","Lavender","Teal","Olive",
                         "Indigo","Peach","Gold","Green","Maroon","Pink","Terra Cotta",
@@ -185,113 +149,113 @@ DISCOUNT_OPTIONS     = ["Yes","No"]
 PAYMENT_OPTIONS      = ["Credit Card","Venmo","Cash","PayPal","Debit Card","Bank Transfer"]
 FREQUENCY_OPTIONS    = ["Weekly","Fortnightly","Bi-Weekly","Monthly","Every 3 Months","Quarterly","Annually"]
 
-FEATURE_IMPORTANCES = {
-    "Age": 0.1277, "Review Rating": 0.1235, "Gender": 0.1226,
-    "Season": 0.1066, "Item Purchased": 0.0846, "Previous Purchases": 0.0786,
-    "Color": 0.0669, "Location": 0.0626, "Frequency of Purchases": 0.0511,
-    "Payment Method": 0.0424, "Size": 0.0393, "Category": 0.0353,
-    "Subscription Status": 0.0223, "Shipping Type": 0.0195, "Discount Applied": 0.0169,
-}
-
 # Helper function for encoding categoricals
 def encode(val, options):
-    """Encode categorical value to its index in the options list."""
-    return options.index(val) if val in options else 0
+    """Encode categorical value to its index."""
+    try:
+        return options.index(val)
+    except ValueError:
+        return 0
 
-# ── UI ────────────────────────────────────────────────────────────────────────
+# ── UI Header ────────────────────────────────────────────────────────────────
 st.markdown("<h1>🛍️ Purchase Amount Predictor</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center;color:#7b8eb8;margin-top:-0.5rem;margin-bottom:1.5rem;'>Random Forest · Shopping Behaviour Model</p>", unsafe_allow_html=True)
-
-# Check if model is loaded before proceeding
-if not model_loaded:
-    st.stop()
+st.markdown("<p style='text-align:center;color:#7b8eb8;margin-bottom:1.5rem;'>Random Forest · Shopping Behaviour Model</p>", unsafe_allow_html=True)
 
 # ── Input Form ────────────────────────────────────────────────────────────────
-st.markdown("<div class='card'>", unsafe_allow_html=True)
-st.markdown("### 👤 Customer Profile")
-col1, col2, col3 = st.columns(3)
-with col1:
-    age = st.number_input("Age", min_value=18, max_value=80, value=30, step=1)
-with col2:
-    gender = st.selectbox("Gender", GENDER_OPTIONS)
-with col3:
-    previous_purchases = st.number_input("Previous Purchases", min_value=0, max_value=100, value=5, step=1)
-st.markdown("</div>", unsafe_allow_html=True)
+with st.container():
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown("### 👤 Customer Profile")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        age = st.number_input("Age", min_value=18, max_value=80, value=30, step=1)
+    with col2:
+        gender = st.selectbox("Gender", GENDER_OPTIONS)
+    with col3:
+        previous_purchases = st.number_input("Previous Purchases", min_value=0, max_value=100, value=5, step=1)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("<div class='card'>", unsafe_allow_html=True)
-st.markdown("### 🛒 Product Details")
-col1, col2 = st.columns(2)
-with col1:
-    item = st.selectbox("Item Purchased", ITEM_OPTIONS)
-    category = st.selectbox("Category", CATEGORY_OPTIONS)
-    color = st.selectbox("Color", COLOR_OPTIONS)
-with col2:
-    size = st.selectbox("Size", SIZE_OPTIONS)
-    season = st.selectbox("Season", SEASON_OPTIONS)
-    review_rating = st.slider("Review Rating", 1.0, 5.0, 3.5, 0.1)
-st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown("### 🛒 Product Details")
+    col1, col2 = st.columns(2)
+    with col1:
+        item = st.selectbox("Item Purchased", ITEM_OPTIONS)
+        category = st.selectbox("Category", CATEGORY_OPTIONS)
+        color = st.selectbox("Color", COLOR_OPTIONS)
+    with col2:
+        size = st.selectbox("Size", SIZE_OPTIONS)
+        season = st.selectbox("Season", SEASON_OPTIONS)
+        review_rating = st.slider("Review Rating", 1.0, 5.0, 3.5, 0.1)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("<div class='card'>", unsafe_allow_html=True)
-st.markdown("### 📦 Transaction Details")
-col1, col2 = st.columns(2)
-with col1:
-    location = st.selectbox("Location (State)", sorted(LOCATION_OPTIONS))
-    shipping = st.selectbox("Shipping Type", SHIPPING_OPTIONS)
-    subscription = st.selectbox("Subscription Status", SUBSCRIPTION_OPTIONS)
-with col2:
-    discount = st.selectbox("Discount Applied", DISCOUNT_OPTIONS)
-    payment = st.selectbox("Payment Method", PAYMENT_OPTIONS)
-    frequency = st.selectbox("Frequency of Purchases", FREQUENCY_OPTIONS)
-st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown("### 📦 Transaction Details")
+    col1, col2 = st.columns(2)
+    with col1:
+        location = st.selectbox("Location (State)", LOCATION_OPTIONS)
+        shipping = st.selectbox("Shipping Type", SHIPPING_OPTIONS)
+        subscription = st.selectbox("Subscription Status", SUBSCRIPTION_OPTIONS)
+    with col2:
+        discount = st.selectbox("Discount Applied", DISCOUNT_OPTIONS)
+        payment = st.selectbox("Payment Method", PAYMENT_OPTIONS)
+        frequency = st.selectbox("Frequency of Purchases", FREQUENCY_OPTIONS)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# ── Predict ───────────────────────────────────────────────────────────────────
-if st.button("✨  Predict Purchase Amount"):
+# ── Predict Button ────────────────────────────────────────────────────────────
+if st.button("✨  Predict Purchase Amount", type="primary", use_container_width=True):
     # Prepare features in the correct order
     features = np.array([[
-        age,
-        encode(gender, GENDER_OPTIONS),
-        encode(item, ITEM_OPTIONS),
-        encode(category, CATEGORY_OPTIONS),
-        encode(location, sorted(LOCATION_OPTIONS)),
-        encode(size, SIZE_OPTIONS),
-        encode(color, COLOR_OPTIONS),
-        encode(season, SEASON_OPTIONS),
-        review_rating,
-        encode(subscription, SUBSCRIPTION_OPTIONS),
-        encode(shipping, SHIPPING_OPTIONS),
-        encode(discount, DISCOUNT_OPTIONS),
-        previous_purchases,
-        encode(payment, PAYMENT_OPTIONS),
-        encode(frequency, FREQUENCY_OPTIONS),
+        float(age),
+        float(encode(gender, GENDER_OPTIONS)),
+        float(encode(item, ITEM_OPTIONS)),
+        float(encode(category, CATEGORY_OPTIONS)),
+        float(encode(location, LOCATION_OPTIONS)),
+        float(encode(size, SIZE_OPTIONS)),
+        float(encode(color, COLOR_OPTIONS)),
+        float(encode(season, SEASON_OPTIONS)),
+        float(review_rating),
+        float(encode(subscription, SUBSCRIPTION_OPTIONS)),
+        float(encode(shipping, SHIPPING_OPTIONS)),
+        float(encode(discount, DISCOUNT_OPTIONS)),
+        float(previous_purchases),
+        float(encode(payment, PAYMENT_OPTIONS)),
+        float(encode(frequency, FREQUENCY_OPTIONS)),
     ]])
     
     try:
+        # Make prediction
         prediction = model.predict(features)[0]
         
+        # Display result
         st.markdown(f"""
         <div class='result-box'>
             <div class='result-label'>Predicted Purchase Amount</div>
-            <div class='result-amount'>${prediction:.2f}</div>
+            <div class='result-amount'>${prediction:,.2f}</div>
             <div class='result-label' style='margin-top:0.5rem;font-size:0.75rem;opacity:0.7;'>
-                RandomForestRegressor · 100 trees · 15 features
+                Random Forest Regressor
             </div>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Add a small celebration effect
+        st.balloons()
+        
     except Exception as e:
-        st.error(f"Prediction failed: {e}")
+        st.error(f"❌ Prediction failed: {str(e)}")
+        st.info("Please check if the model expects different features or input format.")
 
-# ── Feature Importance ────────────────────────────────────────────────────────
-st.markdown("<br>", unsafe_allow_html=True)
-with st.expander("📊 Feature Importances", expanded=False):
-    max_imp = max(FEATURE_IMPORTANCES.values())
-    for feat, imp in FEATURE_IMPORTANCES.items():
-        pct = imp * 100
-        bar_w = int((imp / max_imp) * 100)
-        st.markdown(f"""
-        <div class='feat-bar-wrap'>
-            <div class='feat-label'><span>{feat}</span><span>{pct:.1f}%</span></div>
-            <div class='feat-bar-bg'>
-                <div class='feat-bar-fill' style='width:{bar_w}%;'></div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+# ── Feature Importance (Optional) ────────────────────────────────────────────
+with st.expander("ℹ️ About the Model", expanded=False):
+    st.markdown("""
+    **Model Information:**
+    - **Algorithm:** Random Forest Regressor
+    - **Features:** 15 customer and product attributes
+    - **Target:** Purchase amount in USD
+    
+    **How to use:**
+    1. Fill in customer details
+    2. Select product information
+    3. Add transaction details
+    4. Click "Predict Purchase Amount"
+    
+    The model will estimate the likely purchase amount based on historical shopping patterns.
+    """)
