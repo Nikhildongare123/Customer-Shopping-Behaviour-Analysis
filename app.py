@@ -2,6 +2,7 @@ import streamlit as st
 import pickle
 import numpy as np
 import warnings
+import gzip
 warnings.filterwarnings("ignore")
 
 # ── Page config ──────────────────────────────────────────────────────────────
@@ -141,7 +142,7 @@ hr { border-color: rgba(226,201,126,0.15) !important; }
 # ── Load Model ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    with open("1776502619820_model__3_.pkl", "rb") as f:
+    with open("model.pkl.gz", "rb") as f:
         return pickle.load(f)
 
 try:
