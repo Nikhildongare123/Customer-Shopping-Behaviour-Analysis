@@ -3,88 +3,255 @@ import pickle
 import numpy as np
 import warnings
 import gzip
-import pandas as pd
 warnings.filterwarnings("ignore")
+
+# ── ASCII Art Styling ──────────────────────────────────────────────────────────
+ASCII_ART = """
+    ╔══════════════════════════════════════════════════════════════╗
+    ║                     🛍️  PURCHASE PREDICTOR  🛍️               ║
+    ║              Random Forest · Shopping Behaviour AI            ║
+    ╚══════════════════════════════════════════════════════════════╝
+"""
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="🛍️ Purchase Amount Predictor",
     page_icon="🛍️",
     layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────────
+# ── Custom CSS with PERFECT Background ─────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500&display=swap');
+/* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500&family=Fira+Code:wght@400;600&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
-}
-
+/* Fix Streamlit default white background */
 .stApp {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
     min-height: 100vh;
 }
 
-h1 {
-    font-family: 'Playfair Display', serif !important;
-    color: #e2c97e !important;
-    letter-spacing: 1px;
-    text-align: center;
+/* Main container background fix */
+.main > div {
+    background: transparent !important;
 }
 
+/* Block container styling */
+.block-container {
+    background: transparent !important;
+    padding-top: 2rem !important;
+}
+
+/* All text colors */
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+    color: #e6e6fa !important;
+}
+
+/* Title styling with ASCII art feel */
+h1 {
+    font-family: 'Fira Code', monospace !important;
+    background: linear-gradient(135deg, #e2c97e, #f0a500);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-align: center;
+    font-size: 2.5rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 2px;
+    margin-bottom: 0.5rem !important;
+}
+
+/* Subtitle */
+.subtitle {
+    text-align: center;
+    color: #a8b2d8;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 3px;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid rgba(226,201,126,0.3);
+    display: inline-block;
+    padding-bottom: 0.5rem;
+}
+
+/* Cards with glass morphism */
 .card {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(226,201,126,0.2);
-    border-radius: 16px;
+    background: rgba(15, 12, 41, 0.6);
+    border: 1px solid rgba(226,201,126,0.25);
+    border-radius: 20px;
     padding: 1.5rem 2rem;
     margin-bottom: 1.2rem;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    transition: transform 0.3s ease;
 }
 
+.card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(226,201,126,0.5);
+}
+
+/* Result box */
 .result-box {
-    background: linear-gradient(135deg, #e2c97e22, #f0a50022);
+    background: linear-gradient(135deg, rgba(226,201,126,0.15), rgba(240,165,0,0.15));
     border: 2px solid #e2c97e;
-    border-radius: 20px;
+    border-radius: 25px;
     padding: 2rem;
     text-align: center;
     margin-top: 1.5rem;
+    backdrop-filter: blur(10px);
+    animation: glow 2s ease-in-out infinite alternate;
 }
+
+@keyframes glow {
+    from {
+        box-shadow: 0 0 10px rgba(226,201,126,0.3);
+    }
+    to {
+        box-shadow: 0 0 20px rgba(226,201,126,0.6);
+    }
+}
+
 .result-amount {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Fira Code', monospace;
     font-size: 3.5rem;
-    color: #e2c97e;
+    background: linear-gradient(135deg, #e2c97e, #f0a500);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     line-height: 1;
+    font-weight: bold;
 }
+
 .result-label {
     color: #a8b2d8;
-    font-size: 0.9rem;
-    letter-spacing: 2px;
+    font-size: 0.85rem;
+    letter-spacing: 3px;
     text-transform: uppercase;
     margin-top: 0.5rem;
 }
 
-.stButton > button {
-    background: linear-gradient(135deg, #e2c97e, #f0a500) !important;
-    color: #1a1a2e !important;
-    font-weight: 700 !important;
-    border: none !important;
+/* Input fields */
+.stSelectbox > div > div, .stNumberInput > div > div {
+    background: rgba(15, 12, 41, 0.8) !important;
+    border: 1px solid rgba(226,201,126,0.3) !important;
     border-radius: 12px !important;
-    padding: 0.75rem 2rem !important;
-    width: 100%;
-    transition: all 0.2s ease !important;
-}
-.stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(226,201,126,0.4) !important;
+    color: #e6e6fa !important;
 }
 
-/* Fix for select boxes */
 .stSelectbox label, .stSlider label, .stNumberInput label {
-    color: #a8b2d8 !important;
+    color: #e2c97e !important;
+    font-size: 0.8rem !important;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 500 !important;
+}
+
+/* Slider styling */
+.stSlider > div > div > div {
+    background-color: #e2c97e !important;
+}
+
+/* Button styling */
+.stButton > button {
+    background: linear-gradient(135deg, #e2c97e, #f0a500) !important;
+    color: #0f0c29 !important;
+    font-family: 'Fira Code', monospace !important;
+    font-weight: 700 !important;
+    font-size: 1rem !important;
+    border: none !important;
+    border-radius: 15px !important;
+    padding: 0.85rem 2rem !important;
+    width: 100%;
+    letter-spacing: 2px;
+    transition: all 0.3s ease !important;
+    text-transform: uppercase;
+}
+
+.stButton > button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(226,201,126,0.5) !important;
+    letter-spacing: 3px;
+}
+
+/* Social links styling */
+.social-links {
+    text-align: center;
+    margin-top: 2rem;
+    padding: 1rem;
+    border-top: 1px solid rgba(226,201,126,0.2);
+}
+
+.social-btn {
+    display: inline-block;
+    margin: 0 10px;
+    padding: 8px 20px;
+    background: rgba(226,201,126,0.1);
+    border: 1px solid rgba(226,201,126,0.3);
+    border-radius: 30px;
+    color: #e2c97e;
+    text-decoration: none;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+}
+
+.social-btn:hover {
+    background: rgba(226,201,126,0.2);
+    border-color: #e2c97e;
+    transform: translateY(-2px);
+    letter-spacing: 1px;
+}
+
+/* ASCII art styling */
+.ascii-container {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.ascii-art {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    color: #e2c97e;
+    white-space: pre;
+    display: inline-block;
+    text-shadow: 0 0 10px rgba(226,201,126,0.3);
+    line-height: 1.2;
+}
+
+/* Hide Streamlit branding */
+#MainMenu { visibility: hidden; }
+footer { visibility: hidden; }
+header { visibility: hidden; }
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #0f0c29;
+}
+::-webkit-scrollbar-thumb {
+    background: #e2c97e;
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #f0a500;
 }
 </style>
+""", unsafe_allow_html=True)
+
+# ── Display ASCII Art ──────────────────────────────────────────────────────────
+st.markdown(f"""
+<div class='ascii-container'>
+    <pre class='ascii-art'>
+{ASCII_ART}
+    </pre>
+</div>
 """, unsafe_allow_html=True)
 
 # ── Load Model ────────────────────────────────────────────────────────────────
@@ -92,7 +259,6 @@ h1 {
 def load_model():
     """Load the trained model from a gzipped pickle file."""
     try:
-        # Try different possible filenames
         possible_files = ["model.pkl.gz", "1776502619820_model__3_.pkl", "model.pkl"]
         
         for filename in possible_files:
@@ -103,20 +269,18 @@ def load_model():
                 else:
                     with open(filename, "rb") as f:
                         model = pickle.load(f)
-                st.success(f"✅ Model loaded successfully from {filename}")
                 return model
             except FileNotFoundError:
                 continue
-            except Exception as e:
+            except Exception:
                 continue
         
-        st.error("❌ No model file found. Please check the model file name.")
+        st.error("❌ No model file found.")
         return None
     except Exception as e:
         st.error(f"❌ Model loading failed: {e}")
         return None
 
-# Load the model
 model = load_model()
 
 if model is None:
@@ -149,7 +313,6 @@ DISCOUNT_OPTIONS     = ["Yes","No"]
 PAYMENT_OPTIONS      = ["Credit Card","Venmo","Cash","PayPal","Debit Card","Bank Transfer"]
 FREQUENCY_OPTIONS    = ["Weekly","Fortnightly","Bi-Weekly","Monthly","Every 3 Months","Quarterly","Annually"]
 
-# Helper function for encoding categoricals
 def encode(val, options):
     """Encode categorical value to its index."""
     try:
@@ -157,14 +320,14 @@ def encode(val, options):
     except ValueError:
         return 0
 
-# ── UI Header ────────────────────────────────────────────────────────────────
-st.markdown("<h1>🛍️ Purchase Amount Predictor</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center;color:#7b8eb8;margin-bottom:1.5rem;'>Random Forest · Shopping Behaviour Model</p>", unsafe_allow_html=True)
+# ── Main Title ────────────────────────────────────────────────────────────────
+st.markdown("<h1>⚡ PURCHASE AMOUNT PREDICTOR ⚡</h1>", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center;'><div class='subtitle'>RANDOM FOREST · SHOPPING BEHAVIOUR AI</div></div>", unsafe_allow_html=True)
 
 # ── Input Form ────────────────────────────────────────────────────────────────
 with st.container():
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.markdown("### 👤 Customer Profile")
+    st.markdown("### 👤 CUSTOMER PROFILE")
     col1, col2, col3 = st.columns(3)
     with col1:
         age = st.number_input("Age", min_value=18, max_value=80, value=30, step=1)
@@ -175,7 +338,7 @@ with st.container():
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.markdown("### 🛒 Product Details")
+    st.markdown("### 🛒 PRODUCT DETAILS")
     col1, col2 = st.columns(2)
     with col1:
         item = st.selectbox("Item Purchased", ITEM_OPTIONS)
@@ -188,7 +351,7 @@ with st.container():
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.markdown("### 📦 Transaction Details")
+    st.markdown("### 📦 TRANSACTION DETAILS")
     col1, col2 = st.columns(2)
     with col1:
         location = st.selectbox("Location (State)", LOCATION_OPTIONS)
@@ -201,8 +364,7 @@ with st.container():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ── Predict Button ────────────────────────────────────────────────────────────
-if st.button("✨  Predict Purchase Amount", type="primary", use_container_width=True):
-    # Prepare features in the correct order
+if st.button("✨ PREDICT PURCHASE AMOUNT ✨", type="primary", use_container_width=True):
     features = np.array([[
         float(age),
         float(encode(gender, GENDER_OPTIONS)),
@@ -222,40 +384,43 @@ if st.button("✨  Predict Purchase Amount", type="primary", use_container_width
     ]])
     
     try:
-        # Make prediction
         prediction = model.predict(features)[0]
         
-        # Display result
         st.markdown(f"""
         <div class='result-box'>
-            <div class='result-label'>Predicted Purchase Amount</div>
+            <div class='result-label'>══ PREDICTED PURCHASE AMOUNT ══</div>
             <div class='result-amount'>${prediction:,.2f}</div>
-            <div class='result-label' style='margin-top:0.5rem;font-size:0.75rem;opacity:0.7;'>
-                Random Forest Regressor
-            </div>
+            <div class='result-label'>Random Forest Regressor · 100 Trees</div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Add a small celebration effect
         st.balloons()
         
     except Exception as e:
         st.error(f"❌ Prediction failed: {str(e)}")
-        st.info("Please check if the model expects different features or input format.")
 
-# ── Feature Importance (Optional) ────────────────────────────────────────────
-with st.expander("ℹ️ About the Model", expanded=False):
-    st.markdown("""
-    **Model Information:**
-    - **Algorithm:** Random Forest Regressor
-    - **Features:** 15 customer and product attributes
-    - **Target:** Purchase amount in USD
-    
-    **How to use:**
-    1. Fill in customer details
-    2. Select product information
-    3. Add transaction details
-    4. Click "Predict Purchase Amount"
-    
-    The model will estimate the likely purchase amount based on historical shopping patterns.
-    """)
+# ── Social Links & Footer ─────────────────────────────────────────────────────
+st.markdown("""
+<div class='social-links'>
+    <a href='https://linkedin.com/in/YOUR_USERNAME' target='_blank' class='social-btn'>
+        🔗 LinkedIn
+    </a>
+    <a href='https://github.com/YOUR_USERNAME' target='_blank' class='social-btn'>
+        🐙 GitHub
+    </a>
+    <a href='https://twitter.com/YOUR_USERNAME' target='_blank' class='social-btn'>
+        🐦 Twitter
+    </a>
+</div>
+""", unsafe_allow_html=True)
+
+# Footer with ASCII style
+st.markdown("""
+<div style='text-align: center; margin-top: 2rem; padding: 1rem;'>
+    <pre style='font-family: "Fira Code", monospace; font-size: 0.7rem; color: #e2c97e; opacity: 0.6;'>
+    ════════════════════════════════════════════════════════════════
+    🛍️  AI-Powered Shopping Predictor | Built with Streamlit  🛍️
+    ════════════════════════════════════════════════════════════════
+    </pre>
+</div>
+""", unsafe_allow_html=True)
