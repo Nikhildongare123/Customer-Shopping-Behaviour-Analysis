@@ -3,6 +3,8 @@ import pickle
 import numpy as np
 import warnings
 import gzip
+import os
+from pathlib import Path
 warnings.filterwarnings("ignore")
 
 # ── ASCII Art Styling ──────────────────────────────────────────────────────────
@@ -50,7 +52,7 @@ html, body, [class*="css"] {
     color: #e6e6fa !important;
 }
 
-/* Title styling with ASCII art feel */
+/* Title styling */
 h1 {
     font-family: 'Fira Code', monospace !important;
     background: linear-gradient(135deg, #e2c97e, #f0a500);
@@ -254,36 +256,127 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Load Model ────────────────────────────────────────────────────────────────
+# ── Load Model with File Detection ────────────────────────────────────────────────
 @st.cache_resource
-def load_model():
-    """Load the trained model from a gzipped pickle file."""
+def find_and_load_model():
+    """Automatically find and load model file from various locations."""
+    
+    # List all possible model filenames
+    possible_filenames = [
+        "model.pkl.gz",
+        "model.pkl",
+        "1776502619820_model__3_.pkl",
+        "1776502619820_model__3_.pkl.gz",
+        "purchase_model.pkl",
+        "random_forest_model.pkl",
+        "shopping_model.pkl.gz"
+    ]
+    
+    # List all possible directories to check
+    directories_to_check = [
+        ".",  # Current directory
+        "./models",
+        "./model",
+        "../models",
+        str(Path.home() / "Downloads"),  # Downloads folder
+        str(Path.home() / "Desktop"),    # Desktop folder
+    ]
+    
+    found_files = []
+    
+    # Search for model files
+    for directory in directories_to_check:
+        if os.path.exists(directory):
+            for filename in possible_filenames:
+                filepath = os.path.join(directory, filename)
+                if os.path.exists(filepath):
+                    found_files.append(filepath)
+    
+    # Also search for any .pkl or .pkl.gz files in current directory
+    for file in os.listdir("."):
+        if file.endswith((".pkl", ".pkl.gz")) and "model" in file.lower():
+            if os.path.join(".", file) not in found_files:
+                found_files.append(os.path.join(".", file))
+    
+    # Try to load each found file
+    for filepath in found_files:
+        try:
+            if filepath.endswith('.gz'):
+                with gzip.open(filepath, "rb") as f:
+                    model = pickle.load(f)
+            else:
+                with open(filepath, "rb") as f:
+                    model = pickle.load(f)
+            
+            # Success! Return the model and file info
+            return model, filepath
+        except Exception as e:
+            continue
+    
+    # If no model found, return None
+    return None, None
+
+# Load the model
+model, model_path = find_and_load_model()
+
+# ── Display Model Status ──────────────────────────────────────────────────────
+if model is not None:
+    st.success(f"✅ Model loaded successfully from: `{model_path}`")
+    
+    # Try to get model info
     try:
-        possible_files = ["model.pkl.gz", "1776502619820_model__3_.pkl", "model.pkl"]
-        
-        for filename in possible_files:
-            try:
-                if filename.endswith('.gz'):
-                    with gzip.open(filename, "rb") as f:
-                        model = pickle.load(f)
-                else:
-                    with open(filename, "rb") as f:
-                        model = pickle.load(f)
-                return model
-            except FileNotFoundError:
-                continue
-            except Exception:
-                continue
-        
-        st.error("❌ No model file found.")
-        return None
-    except Exception as e:
-        st.error(f"❌ Model loading failed: {e}")
-        return None
-
-model = load_model()
-
-if model is None:
+        if hasattr(model, 'n_estimators'):
+            st.info(f"📊 Model: Random Forest with {model.n_estimators} trees")
+        elif hasattr(model, 'best_estimator_'):
+            st.info(f"📊 Model: {type(model).__name__} (Optimized)")
+        else:
+            st.info(f"📊 Model Type: {type(model).__name__}")
+    except:
+        pass
+else:
+    st.error("""
+    ❌ **No model file found!**
+    
+    **Please upload your model file using the file uploader below:**
+    """)
+    
+    # File uploader as fallback
+    uploaded_file = st.file_uploader(
+        "Upload your model file (.pkl or .pkl.gz)", 
+        type=['pkl', 'gz']
+    )
+    
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith('.gz'):
+                model = pickle.load(gzip.open(uploaded_file, 'rb'))
+            else:
+                model = pickle.load(uploaded_file)
+            st.success("✅ Model loaded successfully from upload!")
+            model_path = "uploaded_file"
+        except Exception as e:
+            st.error(f"❌ Failed to load uploaded model: {e}")
+    
+    st.info("""
+    **Troubleshooting tips:**
+    1. Make sure your model file is in the same folder as this app
+    2. Check the file name (expected: `model.pkl.gz` or similar)
+    3. Or use the file uploader above to upload your model
+    """)
+    
+    # Show current directory contents
+    st.markdown("### 📁 Files in current directory:")
+    try:
+        files = os.listdir(".")
+        pkl_files = [f for f in files if f.endswith(('.pkl', '.pkl.gz'))]
+        if pkl_files:
+            for f in pkl_files:
+                st.code(f"📄 {f}")
+        else:
+            st.code("No .pkl or .pkl.gz files found")
+    except:
+        pass
+    
     st.stop()
 
 # ── Feature Options ───────────────────────────────────────────────────────────
@@ -365,39 +458,43 @@ with st.container():
 
 # ── Predict Button ────────────────────────────────────────────────────────────
 if st.button("✨ PREDICT PURCHASE AMOUNT ✨", type="primary", use_container_width=True):
-    features = np.array([[
-        float(age),
-        float(encode(gender, GENDER_OPTIONS)),
-        float(encode(item, ITEM_OPTIONS)),
-        float(encode(category, CATEGORY_OPTIONS)),
-        float(encode(location, LOCATION_OPTIONS)),
-        float(encode(size, SIZE_OPTIONS)),
-        float(encode(color, COLOR_OPTIONS)),
-        float(encode(season, SEASON_OPTIONS)),
-        float(review_rating),
-        float(encode(subscription, SUBSCRIPTION_OPTIONS)),
-        float(encode(shipping, SHIPPING_OPTIONS)),
-        float(encode(discount, DISCOUNT_OPTIONS)),
-        float(previous_purchases),
-        float(encode(payment, PAYMENT_OPTIONS)),
-        float(encode(frequency, FREQUENCY_OPTIONS)),
-    ]])
-    
-    try:
-        prediction = model.predict(features)[0]
+    if model is not None:
+        features = np.array([[
+            float(age),
+            float(encode(gender, GENDER_OPTIONS)),
+            float(encode(item, ITEM_OPTIONS)),
+            float(encode(category, CATEGORY_OPTIONS)),
+            float(encode(location, LOCATION_OPTIONS)),
+            float(encode(size, SIZE_OPTIONS)),
+            float(encode(color, COLOR_OPTIONS)),
+            float(encode(season, SEASON_OPTIONS)),
+            float(review_rating),
+            float(encode(subscription, SUBSCRIPTION_OPTIONS)),
+            float(encode(shipping, SHIPPING_OPTIONS)),
+            float(encode(discount, DISCOUNT_OPTIONS)),
+            float(previous_purchases),
+            float(encode(payment, PAYMENT_OPTIONS)),
+            float(encode(frequency, FREQUENCY_OPTIONS)),
+        ]])
         
-        st.markdown(f"""
-        <div class='result-box'>
-            <div class='result-label'>══ PREDICTED PURCHASE AMOUNT ══</div>
-            <div class='result-amount'>${prediction:,.2f}</div>
-            <div class='result-label'>Random Forest Regressor · 100 Trees</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.balloons()
-        
-    except Exception as e:
-        st.error(f"❌ Prediction failed: {str(e)}")
+        try:
+            prediction = model.predict(features)[0]
+            
+            st.markdown(f"""
+            <div class='result-box'>
+                <div class='result-label'>══ PREDICTED PURCHASE AMOUNT ══</div>
+                <div class='result-amount'>${prediction:,.2f}</div>
+                <div class='result-label'>Random Forest Regressor</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.balloons()
+            
+        except Exception as e:
+            st.error(f"❌ Prediction failed: {str(e)}")
+            st.info("The model might expect different feature names or format. Check model training details.")
+    else:
+        st.error("❌ No model loaded. Please upload a model file first.")
 
 # ── Social Links & Footer ─────────────────────────────────────────────────────
 st.markdown("""
