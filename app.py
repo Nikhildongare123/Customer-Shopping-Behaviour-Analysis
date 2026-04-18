@@ -142,19 +142,21 @@ hr { border-color: rgba(226,201,126,0.15) !important; }
 # ── Load Model ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
+    """Load the trained model from a gzipped pickle file."""
     try:
         with gzip.open("model.pkl.gz", "rb") as f:
             model = pickle.load(f)
         return model
+    except FileNotFoundError:
+        st.error("❌ Model file 'model.pkl.gz' not found. Please ensure it exists in the application directory.")
+        return None
     except Exception as e:
         st.error(f"❌ Model loading failed: {e}")
         return None
 
-try:
-    model = load_model()
-    model_loaded = True
-except FileNotFoundError:
-    model_loaded = False
+# Load the model
+model = load_model()
+model_loaded = model is not None
 
 # ── Feature Options ───────────────────────────────────────────────────────────
 GENDER_OPTIONS       = ["Male", "Female"]
@@ -191,16 +193,17 @@ FEATURE_IMPORTANCES = {
     "Subscription Status": 0.0223, "Shipping Type": 0.0195, "Discount Applied": 0.0169,
 }
 
-# Encode categoricals as label encoding (simple index)
+# Helper function for encoding categoricals
 def encode(val, options):
+    """Encode categorical value to its index in the options list."""
     return options.index(val) if val in options else 0
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 st.markdown("<h1>🛍️ Purchase Amount Predictor</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align:center;color:#7b8eb8;margin-top:-0.5rem;margin-bottom:1.5rem;'>Random Forest · Shopping Behaviour Model</p>", unsafe_allow_html=True)
 
+# Check if model is loaded before proceeding
 if not model_loaded:
-    st.error("⚠️ Model file not found. Place `1776502619820_model__3_.pkl` in the same folder as this app.")
     st.stop()
 
 # ── Input Form ────────────────────────────────────────────────────────────────
@@ -208,11 +211,11 @@ st.markdown("<div class='card'>", unsafe_allow_html=True)
 st.markdown("### 👤 Customer Profile")
 col1, col2, col3 = st.columns(3)
 with col1:
-    age = st.number_input("Age", min_value=18, max_value=80, value=30)
+    age = st.number_input("Age", min_value=18, max_value=80, value=30, step=1)
 with col2:
     gender = st.selectbox("Gender", GENDER_OPTIONS)
 with col3:
-    previous_purchases = st.number_input("Previous Purchases", min_value=0, max_value=100, value=5)
+    previous_purchases = st.number_input("Previous Purchases", min_value=0, max_value=100, value=5, step=1)
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<div class='card'>", unsafe_allow_html=True)
@@ -243,6 +246,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 # ── Predict ───────────────────────────────────────────────────────────────────
 if st.button("✨  Predict Purchase Amount"):
+    # Prepare features in the correct order
     features = np.array([[
         age,
         encode(gender, GENDER_OPTIONS),
@@ -260,18 +264,21 @@ if st.button("✨  Predict Purchase Amount"):
         encode(payment, PAYMENT_OPTIONS),
         encode(frequency, FREQUENCY_OPTIONS),
     ]])
-
-    prediction = model.predict(features)[0]
-
-    st.markdown(f"""
-    <div class='result-box'>
-        <div class='result-label'>Predicted Purchase Amount</div>
-        <div class='result-amount'>${prediction:.2f}</div>
-        <div class='result-label' style='margin-top:0.5rem;font-size:0.75rem;opacity:0.7;'>
-            RandomForestRegressor · 100 trees · 15 features
+    
+    try:
+        prediction = model.predict(features)[0]
+        
+        st.markdown(f"""
+        <div class='result-box'>
+            <div class='result-label'>Predicted Purchase Amount</div>
+            <div class='result-amount'>${prediction:.2f}</div>
+            <div class='result-label' style='margin-top:0.5rem;font-size:0.75rem;opacity:0.7;'>
+                RandomForestRegressor · 100 trees · 15 features
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Prediction failed: {e}")
 
 # ── Feature Importance ────────────────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)
