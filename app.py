@@ -499,7 +499,7 @@ if st.button("✨ PREDICT PURCHASE AMOUNT ✨", type="primary", use_container_wi
 # ── Social Links & Footer ─────────────────────────────────────────────────────
 st.markdown("""
 <div class='social-links'>
-    <a href='https://linkedin.com/in/YOUR_USERNAME' target='_blank' class='social-btn'>
+    <a href='https://linkedin.com/in/nikhil-dongare-5958092ba' target='_blank' class='social-btn'>
         🔗 LinkedIn
     </a>
     <a href='https://github.com/YOUR_USERNAME' target='_blank' class='social-btn'>
